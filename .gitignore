@@ -1,8 +1,8 @@
 venv/
-#tests/
+tests/
 __pycache__/
-#*.sqlite3
-#*.old
-#*.log
-#*.service
-#*.sh
+*.sqlite3
+*.old
+*.log
+*.service
+*.sh
