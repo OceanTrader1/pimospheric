@@ -1,6 +1,6 @@
 # <img src="./img/cloudy.png" height=40px width=40px></img>Pimospheric - A Python Weather Data Collection Application
 
-*Utilizes the BME280 Environmental Sensor to connect to a raspberry pi to take the readings of meteorological data.*     
+*Utilizes the [BME280 Environmental Sensor](https://www.amazon.com/dp/B088HJHJXG?psc=1&ref=ppx_yo2ov_dt_b_product_details) to connect to a raspberry pi to take the readings of meteorological data.*     
 
 ![](./img/overview.gif)
 
