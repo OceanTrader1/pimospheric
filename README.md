@@ -1,92 +1,164 @@
-# Raspberry Pi Humidity Sensor
+# <img src="./img/cloudy.png" height=40px width=40px></img>Pimospheric - A Python Weather Data Collection Application
 
-Utilize the BME280 Environmental Sensor, Temperature, Humidity, Barometric Pressure to connect to a raspberry pi to take the readings of meteorological conditions.
+*Utilizes the BME280 Environmental Sensor to connect to a raspberry pi to take the readings of meteorological data.*     
 
-## Getting started
+![](./img/overview.gif)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Sensor Data Collects the Following:     
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Temperature (degrees Celsius)
+- Atmospheric Pressure (hectopascals, hPa)
+- Relative Humidity (%RH)
+- Altitude (meters, m)
 
-## Add your files
+Dewpoint is derived using the temperature and relative humidity readings. 
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+### Requirements
+
+------
+
+The application requires the following dependencies:
+
+- adafruit-circuitpython-bme280
+- adafruit-circuitpython-lis3dh
+- MetPy
+- streamlit
+
+The dependencies can be installed via the `requirements.txt` file via `pip install -r requirements.txt`. I suggest installing these in a virtual environment as many of the features are very "experimental" and may not be guaranteed to work out of the box.
+
+## Getting Started
+
+------
+
+I have the Raspberry Pi model 4B (4gb of RAM) and I will be using this device for this project. I started by downloading Raspberry Pi Imager v1.7.2 from https://www.raspberrypi.com/software/. Once the software is installed, I selected to install Raspberry Pi OS Lite (64-bit) for a headless install. Next, I inserted the SD card and formatted it. The latest Imager software has a gear icon in the bottom-right corner of the screen that appears after you select the operating system. I pre-configured the pi's hostname, ssh, and wireless network settings so that I can ssh directly into the pi once it is powered up.
+
+### SSH Into the Pi and Install Dependencies
+
+------
+
+To get things started, SSH into the pi. By default, a fresh install of Raspberry Pi OS does not come with `git`, `python3-pip`, or `python3-venv` installed. So, I recommend updating (`sudo apt update`) the repository list and installing these. Once logged into the pi, setup a virtual environment for testing purposes. I'm also cloning the repository to my self-hosted gitlab server for version control.
+
+Next, pip install the CircuitPython driver from the PyPI repository with `pip3 install adafruit-circuitpython-bme280` and the CiruitPython library with `pip3 install adafruit-circuitpython-lis3dh`.
+
+
+
+## Selecting A Kernel Interface for Receiving Sensor Data
+
+------
+
+This step is important because, depending on the interface you select, you will need to configure your wiring and code a particular way. There are a number of resources online that explain the pros and cons for each interface but I found [this article](https://learn.sparkfun.com/tutorials/raspberry-pi-spi-and-i2c-tutorial/all) provided a sufficient explanation of the difference between the two.
+
+For this project I will be using the I2C Kernel for simplicity's sake. Also, I find it easier to test/detect board hardware so it makes life a little easier for troubleshooting. <span style="color:cyan">*If you choose to go down the SPI path, note that the wiring and code will be different compared to I2C*</span> and I suggest you look at different tutorials that use this format.
+
+### Enable I2C 
+
+------
+
+Once the drivers and libraries are installed, the I2C kernel drivers need to be enabled before going further. To do so, run `sudo raspi-config` and find the interfaces section and enable I2C and SPI. Once done, reboot the pi with `sudo reboot`.
+
+![](./img/config-i2c.gif)
+
+### Wiring the BME280
+
+------
+
+**Bonus Tip: If you're looking for a really good pinout diagram for the pi, I strongly recommend checking out https://pinout.xyz/ to see what each pin is used for.**
+
+I recommend shutting down the Pi first, removing the power supply, then attaching the GPIO pins. See the table below:
+
+| Color  | Pin Number | BME280 |
+| ------ | :--------: | -----: |
+| Blue   |     3      |    SDI |
+| Yellow |     5      |    SDO |
+| Red    |     17     |    VCC |
+| Black  |     20     |    GND |
+| Orange |   Unused   |        |
+| Green  |   Unused   |        |
+
+![](./img/gpio_pinout_i2c.jpg)
+
+Once the wires have been connected/soldered (based on your preference), boot the pi back up.
+
+### Verify the Pi Can Read the BME280
+
+------
+
+First, verify that the I2C Kernel has started up using `lsmod | grep -E 'i2c_bcm'`. You should see a result similar to the one shown below.
+
+```bash
+pi@raspberrypi:~ $ lsmod | grep 'i2c_bcm'
+i2c_bcm2835            16384  0
+```
+
+Test to ensure that there are no grounds. To do so, install i2c-tools with `sudo apt-get install i2c-tools`. Then, test the connections with `i2cdetect -y 1`.
+
+```bash
+pi@raspberrypi:~ $ i2cdetect -y 1
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f 
+00:                         -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: -- -- -- -- -- -- -- 77
+```
+
+Note, this should be the output if there are no issues (i.e. 77 means that the BME280 is successfully connected to the Pi). If for some reason, you see a 76 instead, check the cables for a ground or loose wiring as an error is being detected.
+
+### Output Data to Console
+
+------
+
+Everything is now setup for collecting our first batch of data. I created a very basic file to collect the temperature, humidity, and pressure readings and output these values to the console:
+
+```python
+"""" basic_reading.py """
+
+import board
+from adafruit_bme280 import basic as adafruit_bme280
+
+def main():
+    i2c = board.I2C()
+    bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)
+    print("\nTemperature: %0.1f C" % bme280.temperature)
+    print("Humidity: %0.1f %%" % bme280.humidity)
+    print("Pressure: %0.1f hPa" % bme280.pressure)
+
+if __name__ == "__main__":
+    main()
+```
+
+
+
+### Optional: Setting Up the Web App
+
+------
+
+If you're interested in going the extra mile (you've already made it this far...so why not!), you can make a full fledged web app and customize the data displayed into a beautiful dashboard. For this purpose, I utilized https://streamlit.io. It's a super easy-to-use and powerful data-visualization service. At this point, if you haven't installed the requirements/dependencies yet, you will need to do so now.
+
+To start the app:
+
+```bash
+(venv) pi@raspberrypi:~/pimospheric $ streamlit run app.py
+
+  You can now view your Streamlit app in your browser.
+
+  Network URL: http://10.0.0.10:8501
+  External URL: http://0.0.0.0:8501
+
 
 ```
-cd existing_repo
-git remote add origin http://gitlab/ocean_trader/raspberry-pi-humidity-sensor.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+Once the app is up an running, you can head over to the provided URL and view your weather tracking site.
 
-- [ ] [Set up project integrations](http://gitlab/ocean_trader/raspberry-pi-humidity-sensor/-/settings/integrations)
 
-## Collaborate with your team
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+### Sources
 
-## Test and Deploy
+- Product page: https://www.waveshare.com/bme280-environmental-sensor.htm 
+- BME 280 Wikipedia Page: https://www.waveshare.com/wiki/BME280_Environmental_Sensor 
+- Adafruit Tutorial (Recommended first source): https://learn.adafruit.com/adafruit-bme280-humidity-barometric-pressure-temperature-sensor-breakout/python-circuitpython-test 
+- BME280 CircuitPython repository - https://github.com/adafruit/Adafruit_CircuitPython_BME280 
 
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!).  Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.

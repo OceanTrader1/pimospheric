@@ -1,0 +1,12 @@
+[Unit]
+Description=Pimospheric weather data collector
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/home/pimospheric/pimo.sh
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
