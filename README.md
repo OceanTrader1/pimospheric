@@ -54,7 +54,7 @@ For this project I will be using the I2C Kernel for simplicity's sake. Also, I f
 
 ------
 
-Once the drivers and libraries are installed, the I2C kernel drivers need to be enabled before going further. To do so, run `sudo raspi-config` and find the interfaces section and enable I2C and SPI. Once done, reboot the pi with `sudo reboot`.
+Once the drivers and libraries are installed, the I2C kernel drivers need to be enabled before going further. To do so, run `sudo raspi-config` and find the interfaces section and enable I2C. Once done, reboot the pi with `sudo reboot`.
 
 ![](./img/config-i2c.gif)
 

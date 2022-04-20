@@ -51,12 +51,7 @@ def table_builder(
 
 
 def main():
-    """ Main loop
-    
-    Arguments:
-        - ticker: int   The interval at which to collect the data 
-                        (e.g. every {ticker} seconds).
-    """
+
     # Polling Rate - The interval at which to collect the data in seconds
     pr = 5 
 
