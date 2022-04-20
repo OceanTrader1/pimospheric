@@ -1,6 +1,6 @@
 # <img src="./img/cloudy.png" height=40px width=40px></img>Pimospheric - A Python Weather Data Collection Application
 
-*Utilizes the BME280 Environmental Sensor to connect to a raspberry pi to take the readings of meteorological data.*     
+*Utilizes the [BME280 Environmental Sensor](https://www.amazon.com/dp/B088HJHJXG?psc=1&ref=ppx_yo2ov_dt_b_product_details) to connect to a raspberry pi to take the readings of meteorological data.*     
 
 ![](./img/overview.gif)
 
@@ -54,7 +54,7 @@ For this project I will be using the I2C Kernel for simplicity's sake. Also, I f
 
 ------
 
-Once the drivers and libraries are installed, the I2C kernel drivers need to be enabled before going further. To do so, run `sudo raspi-config` and find the interfaces section and enable I2C and SPI. Once done, reboot the pi with `sudo reboot`.
+Once the drivers and libraries are installed, the I2C kernel drivers need to be enabled before going further. To do so, run `sudo raspi-config` and find the interfaces section and enable I2C. Once done, reboot the pi with `sudo reboot`.
 
 ![](./img/config-i2c.gif)
 
